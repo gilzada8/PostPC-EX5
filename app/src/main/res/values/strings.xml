@@ -1,3 +1,9 @@
 <resources>
     <string name="app_name">Ex5</string>
+    <string name="startTrack">start tracking</string>
+    <string name="stopTrack">stop tracking</string>
+    <string name="appTitle">Honey I\'m Home!</string>
+    <string name="set_home">set location as home</string>
+    <string name="clear_home">clear home</string>
+    <string name="homeLocationIs">Your home location is defined as:</string>
 </resources>
