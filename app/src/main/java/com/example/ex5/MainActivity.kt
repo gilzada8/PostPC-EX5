@@ -11,6 +11,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.provider.Settings
 import android.view.View
+import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -21,17 +22,26 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.android.synthetic.main.activity_main.*
 
 
+const val NOTIFICATION_ID = 1
 const val REQUEST_LOCATION = 1
+const val REQUEST_SMS = 2
+const val PHONE = "phone"
+const val CONTENT = "content"
+const val HOME = "HomeLocation"
+const val TAG = "HoneyImHome"
+const val PREF_NAME = "HoneyImHome"
+const val CHANNEL_ID = "HoneyImHomeApp"
+const val PREV_LOCATION = "current"
+const val ACTION_SMS = "POST_PC.ACTION_SEND_SMS"
 
 
 class MainActivity : AppCompatActivity() {
-
     private val broadcastReceiver = MyBroadcastReceiver(this)
     private val actionsArray = arrayOf("started", "stopped", "newLocation", "error")
     private var tracking: Boolean = false
     private lateinit var locationTracker: LocationTracker
     private var homeLocation: LocationInfo? = null
-
+    private var phoneNumber: String? = null
 
     class MyBroadcastReceiver(private val mainAct: MainActivity) : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -49,10 +59,8 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(context, intent.action, Toast.LENGTH_SHORT).show()
                 }
             }
-
         }
     }
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         if (loadHomeLocation()) {
             updateHomeLocUI()
         }
+        loadPhoneNumber()
     }
 
     private fun updateHomeLocUI() {
@@ -96,17 +105,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun loadHomeLocation(): Boolean {
         val locationInfoTypeToken = object : TypeToken<LocationInfo>() {}.type
-        val sp = this.getSharedPreferences("HomeLocation", Context.MODE_PRIVATE)
-            .getString("HomeLocation", null)
+        val sp = applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .getString(HOME, null)
         if (sp != null) {
             homeLocation = Gson().fromJson(sp, locationInfoTypeToken)
         }
         return homeLocation != null
     }
 
+    private fun loadPhoneNumber() {
+        phoneNumber = applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            .getString(PHONE, null)
+        if (phoneNumber == null) {
+            setPhone.text = getString(R.string.setDestPhone)
+        } else {
+            setPhone.text = getString(R.string.resetDestPhone)
+            testSMS.visibility = View.VISIBLE
+        }
+    }
+
     private fun saveHomeLocation() {
-        this.getSharedPreferences("HomeLocation", Context.MODE_PRIVATE).edit()
-            .putString("HomeLocation", Gson().toJson(homeLocation)).apply()
+        applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+            .putString(HOME, Gson().toJson(homeLocation)).apply()
     }
 
     private fun setButtonsListener() {
@@ -134,6 +154,34 @@ class MainActivity : AppCompatActivity() {
             saveHomeLocation()
             updateHomeLocUI()
         }
+
+        setPhone.setOnClickListener {
+            if (phoneNumber == null) {
+                if (ActivityCompat.checkSelfPermission(
+                        this,
+                        Manifest.permission.SEND_SMS
+                    ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    setPhoneDialog()
+                } else {
+                    requestSMSPermission()
+                }
+            } else { // reset phone number
+                setPhone.text = getString(R.string.setDestPhone)
+                testSMS.visibility = View.GONE
+                phoneNumber = null
+                applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+                    .putString(PHONE, phoneNumber).apply()
+            }
+        }
+
+        testSMS.setOnClickListener {
+            val intent = Intent(ACTION_SMS)
+            intent.putExtra(PHONE, phoneNumber)
+            intent.putExtra(CONTENT, "Honey I'm Sending a Test Message!")
+            LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(intent)
+        }
+
     }
 
     private fun startTracking() {
@@ -173,6 +221,12 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun requestSMSPermission() {
+        ActivityCompat.requestPermissions(
+            this, arrayOf(Manifest.permission.SEND_SMS), REQUEST_SMS
+        )
+    }
+
     private fun permissionsOK(): Boolean {
         if (!locationTracker.checkGPSOn()) {
             handleGPSOff()
@@ -198,12 +252,39 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "You must permit tracking", Toast.LENGTH_SHORT).show()
                 }
             }
+            REQUEST_SMS -> {
+                if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    setPhoneDialog()
+                } else {
+                    Toast.makeText(this, "You must permit sending SMS", Toast.LENGTH_SHORT).show()
+                }
+            }
         }
+    }
+
+    @SuppressLint("InflateParams")
+    private fun setPhoneDialog() {
+        val builder = AlertDialog.Builder(this)
+        val inflater = layoutInflater
+        builder.setTitle("With EditText")
+        val dialogLayout = inflater.inflate(R.layout.alert_dialog_tv, null)
+        val phoneNum = dialogLayout.findViewById<EditText>(R.id.phoneNumber)
+        builder.setView(dialogLayout)
+        builder.setPositiveButton("OK") { _, _ ->
+            if (android.util.Patterns.PHONE.matcher(phoneNum.text.toString()).matches()) {
+                applicationContext.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE).edit()
+                    .putString(PHONE, phoneNum.text.toString()).apply()
+                this.phoneNumber = phoneNum.text.toString()
+                testSMS.visibility = View.VISIBLE
+                setPhone.text = getString(R.string.resetDestPhone)
+            } else {
+                Toast.makeText(this, "You must enter valid phone number", Toast.LENGTH_SHORT).show()
+            }
+        }.show()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-//        saveTracking()
         locationTracker.stopTracking()
         LocalBroadcastManager.getInstance(this).unregisterReceiver(broadcastReceiver)
     }

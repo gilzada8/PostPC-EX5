@@ -6,4 +6,9 @@
     <string name="set_home">set location as home</string>
     <string name="clear_home">clear home</string>
     <string name="homeLocationIs">Your home location is defined as:</string>
+    <string name="setDestPhone">set SMS phone</string>
+    <string name="resetDestPhone">reset phone</string>
+
+    <string name="testSMS">test SMS</string>
+    <string name="phoneHint">Enter phone</string>
 </resources>

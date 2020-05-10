@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Context.LOCATION_SERVICE
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.location.Location
 import android.location.LocationManager
 import android.os.Looper
 import androidx.core.app.ActivityCompat
@@ -12,16 +13,21 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.google.android.gms.location.*
 
 
-//hold latitude, longitude and accuracy.
 class LocationInfo(
     var latitude: Double,
     var longitude: Double,
     var accuracy: Float
-)
+) {
+    fun toLocation(): Location {
+        val loc = Location("")
+        loc.latitude = latitude
+        loc.longitude = longitude
+        loc.accuracy = accuracy
+        return loc
+    }
+}
 
 class LocationTracker(private val context: Context) {
-
-
     private val fusedLocationClient: FusedLocationProviderClient =
         LocationServices.getFusedLocationProviderClient(context)
     private val locationRequest = LocationRequest.create().apply {
@@ -32,8 +38,7 @@ class LocationTracker(private val context: Context) {
     private var currentLocation = LocationInfo(0.0, 0.0, 0f)
 
     private val locationCallback = object : LocationCallback() {
-        override fun onLocationResult(locationResult: LocationResult?) {
-            locationResult ?: return
+        override fun onLocationResult(locationResult: LocationResult) {
             currentLocation.latitude = locationResult.lastLocation.latitude
             currentLocation.longitude = locationResult.lastLocation.longitude
             currentLocation.accuracy = locationResult.lastLocation.accuracy
